@@ -316,6 +316,33 @@ Real Torque2 (MeshBlock *pmb, int iout) { //planet two torque
   return sum_torque2;
 }
 
+Real Inner_Lindblad_Torque_Planet1 (MeshBlock *pmb, int iout) {
+  int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
+  Real sum_lindblad1 = 0;
+  Real time4 = pmb->pmy_mesh->time;
+  Real thermal_mass = pow(0.05,3);
+  Real horseshoe = 0.05 * rp * ((1.05 * pow((gm_planet/thermal_mass),0.5) + 3.40*pow((gm_planet/thermal_mass),7.0/3.0)) /(1 + 2.0*SQR(gm_planet/thermal_mass)));
+  for (int k=ks; k<=ke; k++) {
+    z = pmb->pcoord->x3v(k);
+    for (int j=js; j<=je; j++) {
+      phi = pmb->pcoord->x2v(j);
+      for (int i=is; i<=ie; i++) {
+        r = pmb->pcoord->x1v(i);
+        Real period = 2 * M_PI * sqrt(pow(rp, 3) / (gm_star + gm_planet));
+        Real phip = 2 * (M_PI / period) * time4;
+        Real d = sqrt(pow(rp,2) + pow(r,2) - 2*rp*r*cos(phi - phip));
+        Real R_H = rp*cbrt(gm_planet/(3*gm_star));
+        Real g_mag = -1*((gm_planet*d) / (sqrt(pow(pow(d,2) + pow(epsilon,2)*pow(R_H,2), 3))));
+        Real dens = pmb->phydro->u(IDN,k,j,i);
+        Real dA = pmb ->pcoord->GetCellVolume(k,j,i);
+        Real sine_term = (r*rp*cos(phi)*sin(phip) - r*rp*sin(phi)*cos(phip)) / (r*d);
+        sum_lindblad1 +=  dens * r * g_mag * sine_term * dA;
+      }
+    }
+  }
+  return sum_lindblad1;
+}
+
 namespace {
 //----------------------------------------------------------------------------------------
 //! transform to cylindrical coordinate
