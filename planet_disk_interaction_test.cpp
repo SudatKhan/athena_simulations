@@ -103,17 +103,19 @@ void Mesh::InitUserMeshData(ParameterInput *pin) {
             int is, int ie, int js, int je, int ks, int ke);
   EnrollViscosityCoefficient(Viscosity);
 
-  /*Real Torque(MeshBlock *pmb, int iout);
-  Real Torque2(MeshBlock *pmb, int iout);
-  AllocateUserHistoryOutput(2);
-  EnrollUserHistoryOutput(0, Torque, "first planet torque");
-  EnrollUserHistoryOutput(1, Torque2, "second planet torque");*/
-
+  Real Total_Torque1(MeshBlock *pmb, int iout);
+  Real Total_Torque2(MeshBlock *pmb, int iout);
   Real Inner_Lindblad_Torque1(MeshBlock *pmb, int iout);
   Real Outer_Lindblad_Torque1(MeshBlock *pmb, int iout);
-  AllocateUserHistoryOutput(2);
-  EnrollUserHistoryOutput(0, Inner_Lindblad_Torque1, "First Planet Inner Lindblad Torque");
-  EnrollUserHistoryOutput(1, Outer_Lindblad_Torque1, "First Planet Outer Lindblad Torque");
+  Real Inner_Lindblad_Torque2(MeshBlock *pmb, int iout);
+  Real Outer_Lindblad_Torque2(MeshBlock *pmb, int iout);
+  AllocateUserHistoryOutput(6);
+  EnrollUserHistoryOutput(0, Total_Torque1, "First Planet Total Torque");
+  EnrollUserHistoryOutput(1, Inner_Lindblad_Torque1, "First Planet Inner Lindblad Torque");
+  EnrollUserHistoryOutput(2, Outer_Lindblad_Torque1, "First Planet Outer Lindblad Torque");
+  EnrollUserHistoryOutput(3, Total_Torque2, "Second Planet Total Torque");
+  EnrollUserHistoryOutput(4, Inner_Lindblad_Torque2, "Second Planet Inner Lindblad Torque");
+  EnrollUserHistoryOutput(5, Outer_Lindblad_Torque2, "Second Planet Outer Lindblad Torque");
   return;
 }
 /*void MeshBlock::InitUserMeshBlockData(ParameterInput *pin) {
@@ -276,9 +278,9 @@ void Viscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &p
   }
 }*/
 
-/*Real Torque(MeshBlock *pmb, int iout) { //planet one torque
+Real Total_Torque1 (MeshBlock *pmb, int iout) { //planet one torque
   int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
-  Real sum_torque = 0;
+  Real sum_torque1 = 0;
   Real time2 = pmb->pmy_mesh->time;
   for(int k=ks; k<=ke; k++) {
     z = pmb->pcoord->x3v(k);
@@ -292,16 +294,16 @@ void Viscosity(HydroDiffusion *phdif, MeshBlock *pmb, const AthenaArray<Real> &p
         Real R_H = rp*cbrt(gm_planet/(3*gm_star));
         Real g_mag = -1*((gm_planet*d) / (sqrt(pow(pow(d,2) + pow(epsilon,2)*pow(R_H,2), 3))));
         Real dens = pmb->phydro->u(IDN,k,j,i);
-        Real volume = pmb ->pcoord->GetCellVolume(k,j,i);
+        Real area = pmb ->pcoord->GetCellVolume(k,j,i);
         Real sine_term = (r*rp*cos(phi)*sin(phip) - r*rp*sin(phi)*cos(phip)) / (r*d);
-        sum_torque +=  dens * volume *r * g_mag * sine_term;
+        sum_torque1 +=  dens * area *r * g_mag * sine_term;
       }
     }
   }
-  return sum_torque;
+  return sum_torque1;
 }
 
-Real Torque2 (MeshBlock *pmb, int iout) { //planet two torque
+Real Total_Torque2 (MeshBlock *pmb, int iout) { //planet two torque
   int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
   Real sum_torque2 = 0;
   Real time3 = pmb->pmy_mesh->time;
@@ -317,61 +319,18 @@ Real Torque2 (MeshBlock *pmb, int iout) { //planet two torque
         Real R_H = rp2*cbrt(gm_planet2/(3*gm_star));
         Real g_mag = -1*((gm_planet2*d) / (sqrt(pow(pow(d,2) + pow(epsilon,2)*pow(R_H,2), 3))));
         Real dens = pmb->phydro->u(IDN,k,j,i);
-        Real volume = pmb ->pcoord->GetCellVolume(k,j,i);
+        Real area = pmb ->pcoord->GetCellVolume(k,j,i);
         Real sine_term = (r*rp2*cos(phi)*sin(phip) - r*rp2*sin(phi)*cos(phip)) / (r*d);
-        sum_torque2 +=  dens * volume *r * g_mag * sine_term;       
+        sum_torque2 +=  dens * area *r * g_mag * sine_term;       
       }
     }
   }
   return sum_torque2;
-} */
-
-/*Real Lindblad_Torque1 (MeshBlock *pmb, int iout) {
-  int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
-  Real sum_lindblad_torque_inner = 0;
-  Real sum_lindblad_torque_outer = 0;
-  Real time4= pmb->pmy_mesh->time;
-  for (int k=ks; k<ke; k++) {
-    z = pmb->pcoord->x3v(k);
-    for (int j=js; j<je; j++) {
-      phi = pmb->pcoord->x2v(j);
-      for (int i=is; i<ie; i++) {
-        r = pmb->pcoord->x1v(i);        
-        Real mass_ratio = (gm_planet/(pow(scale,3.0)));
-        Real horseshoe = scale * (rp) * ((1.05 * pow(mass_ratio, 0.5) + 3.4 * pow(mass_ratio, 7.0/3.0)) / (1.0 + 2.0*pow(mass_ratio, 2.0)));
-        Real inner_horseshoe = rp - horseshoe;
-        Real outer_horseshoe = rp + horseshoe;
-          Real period = 2 * M_PI * sqrt(pow(rp, 3) / (gm_star + gm_planet));
-          Real phip = 2 * (M_PI / period) * time4;
-          Real d = sqrt(pow(rp,2) + pow(r,2) - 2*rp*r*cos(phi - phip));
-          Real R_H = rp*cbrt(gm_planet/(3*gm_star));
-          Real g_mag = -1*((gm_planet*d) / (sqrt(pow(pow(d,2) + pow(epsilon,2)*pow(R_H,2), 3))));
-          Real dens = pmb->phydro->u(IDN,k,j,i);
-          Real area = pmb ->pcoord->GetCellVolume(k,j,i);
-          Real sine_term = (r*rp*cos(phi)*sin(phip) - r*rp*sin(phi)*cos(phip)) / (r*d);
-          sum_lindblad_torque_inner += dens * r * g_mag * sine_term * area;
-
-        if (r >= outer_horseshoe && r <= r_out) {
-          Real period = 2 * M_PI * sqrt(pow(rp, 3) / (gm_star + gm_planet));
-          Real phip = 2 * (M_PI / period) * time4;
-          Real d = sqrt(pow(rp,2) + pow(r,2) - 2*rp*r*cos(phi - phip));
-          Real R_H = rp*cbrt(gm_planet/(3*gm_star));
-          Real g_mag = -1*((gm_planet*d) / (sqrt(pow(pow(d,2) + pow(epsilon,2)*pow(R_H,2), 3))));
-          Real dens = pmb->phydro->u(IDN,k,j,i);
-          Real area = pmb ->pcoord->GetCellVolume(k,j,i);
-          Real sine_term = (r*rp*cos(phi)*sin(phip) - r*rp*sin(phi)*cos(phip)) / (r*d);
-          sum_lindblad_torque_outer += dens * r * g_mag * sine_term * area;
-        }
-      }
-    }
-  }
-  return sum_lindblad_torque_inner;
-  // return sum_lindblad_torque_outer;
-}*/
+}
 
 Real Inner_Lindblad_Torque1 (MeshBlock *pmb, int iout) {
   int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
-  Real sum_lindblad_torque_inner = 0;
+  Real sum_lindblad_torque_inner1 = 0;
   Real time4= pmb->pmy_mesh->time;
   for(int k=ks; k<=ke; k++) {
     z = pmb->pcoord->x3v(k);
@@ -392,17 +351,17 @@ Real Inner_Lindblad_Torque1 (MeshBlock *pmb, int iout) {
           Real dens = pmb->phydro->u(IDN,k,j,i);
           Real area = pmb ->pcoord->GetCellVolume(k,j,i);
           Real sine_term = (r*rp*cos(phi)*sin(phip) - r*rp*sin(phi)*cos(phip)) / (r*d);
-          sum_lindblad_torque_inner +=  dens * r * g_mag * sine_term * area;
+          sum_lindblad_torque_inner1 +=  dens * r * g_mag * sine_term * area;
         }
       }
     }
   }
-  return sum_lindblad_torque_inner;
+  return sum_lindblad_torque_inner1;
 }
 
 Real Outer_Lindblad_Torque1 (MeshBlock *pmb, int iout) {
   int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
-  Real sum_lindblad_torque_outer = 0;
+  Real sum_lindblad_torque_outer1 = 0;
   Real time5 = pmb->pmy_mesh->time;
   for(int k=ks; k<=ke; k++) {
     z = pmb->pcoord->x3v(k);
@@ -423,13 +382,76 @@ Real Outer_Lindblad_Torque1 (MeshBlock *pmb, int iout) {
           Real dens = pmb->phydro->u(IDN,k,j,i);
           Real area = pmb ->pcoord->GetCellVolume(k,j,i);
           Real sine_term = (r*rp*cos(phi)*sin(phip) - r*rp*sin(phi)*cos(phip)) / (r*d);
-          sum_lindblad_torque_outer +=  dens * r * g_mag * sine_term * area;
+          sum_lindblad_torque_outer1 +=  dens * r * g_mag * sine_term * area;
         }
       }
     }
   }
-  return sum_lindblad_torque_outer;
+  return sum_lindblad_torque_outer1;
 }
+
+Real Inner_Lindblad_Torque2 (MeshBlock *pmb, int iout) {
+  int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
+  Real sum_lindblad_torque_inner2 = 0;
+  Real time6= pmb->pmy_mesh->time;
+  for(int k=ks; k<=ke; k++) {
+    z = pmb->pcoord->x3v(k);
+    for(int j=js; j<=je; j++) {
+      phi = pmb->pcoord->x2v(j);
+      for(int i=is; i<=ie; i++) {
+        r = pmb->pcoord->x1v(i);
+        Real mass_ratio = (gm_planet2/(pow(scale,3.0)));
+        Real horseshoe = scale * (rp2) * ((1.05 * pow(mass_ratio, 0.5) + 3.4 * pow(mass_ratio, 7.0/3.0)) / (1.0 + 2.0*pow(mass_ratio, 2.0)));
+        Real inner_horseshoe = rp2 - horseshoe;
+        Real outer_horseshoe = rp2 + horseshoe;
+        if (r <= inner_horseshoe) {
+          Real period = 2 * M_PI * sqrt(pow(rp2, 3) / (gm_star + gm_planet + gm_planet2));
+          Real phip = 2 * (M_PI / period) * time6;
+          Real d = sqrt(pow(rp2,2) + pow(r,2) - 2*rp2*r*cos(phi - phip));
+          Real R_H = rp2*cbrt(gm_planet2/(3*gm_star));
+          Real g_mag = -1*((gm_planet2*d) / (sqrt(pow(pow(d,2) + pow(epsilon,2)*pow(R_H,2), 3))));
+          Real dens = pmb->phydro->u(IDN,k,j,i);
+          Real area = pmb ->pcoord->GetCellVolume(k,j,i);
+          Real sine_term = (r*rp2*cos(phi)*sin(phip) - r*rp2*sin(phi)*cos(phip)) / (r*d);
+          sum_lindblad_torque_inner2 +=  dens * r * g_mag * sine_term * area;
+        }
+      }
+    }
+  }
+  return sum_lindblad_torque_inner2;
+}
+
+Real Outer_Lindblad_Torque2 (MeshBlock *pmb, int iout) {
+  int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
+  Real sum_lindblad_torque_outer2 = 0;
+  Real time7 = pmb->pmy_mesh->time;
+  for(int k=ks; k<=ke; k++) {
+    z = pmb->pcoord->x3v(k);
+    for(int j=js; j<=je; j++) {
+      phi = pmb->pcoord->x2v(j);
+      for(int i=is; i<=ie; i++) {
+        r = pmb->pcoord->x1v(i);
+        Real mass_ratio = (gm_planet2/(pow(scale,3.0)));
+        Real horseshoe = scale * (rp2) * ((1.05 * pow(mass_ratio, 0.5) + 3.4 * pow(mass_ratio, 7.0/3.0)) / (1.0 + 2.0*pow(mass_ratio, 2.0)));
+        Real inner_horseshoe = rp2 - horseshoe;
+        Real outer_horseshoe = rp2 + horseshoe;
+        if (r >= outer_horseshoe) {
+          Real period = 2 * M_PI * sqrt(pow(rp, 3) / (gm_star + gm_planet + gm_planet2));
+          Real phip = 2 * (M_PI / period) * time7;
+          Real d = sqrt(pow(rp2,2) + pow(r,2) - 2*rp2*r*cos(phi - phip));
+          Real R_H = rp2*cbrt(gm_planet2/(3*gm_star));
+          Real g_mag = -1*((gm_planet2*d) / (sqrt(pow(pow(d,2) + pow(epsilon,2)*pow(R_H,2), 3))));
+          Real dens = pmb->phydro->u(IDN,k,j,i);
+          Real area = pmb ->pcoord->GetCellVolume(k,j,i);
+          Real sine_term = (r*rp2*cos(phi)*sin(phip) - r*rp2*sin(phi)*cos(phip)) / (r*d);
+          sum_lindblad_torque_outer2 +=  dens * r * g_mag * sine_term * area;
+        }
+      }
+    }
+  }
+  return sum_lindblad_torque_outer2;
+}
+
 
 namespace {
 //----------------------------------------------------------------------------------------
